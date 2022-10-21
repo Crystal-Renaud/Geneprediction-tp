@@ -1,4 +1,5 @@
 import argparse
+from multiprocessing.resource_sharer import stop
 import sys
 import os
 import csv
@@ -62,22 +63,44 @@ def get_arguments():
 def read_fasta(fasta_file):
     """Extract the complete genome sequence as a single string
     """
-    pass
+    with open(fasta_file, "r") as file:
+        seq = ""
+        for line in file:
+            if line.startswith(">"):
+                    continue
+            else:
+                seq += line.strip()
+    return seq
+
+
 
 def find_start(start_regex, sequence, start, stop):
     """Find the start codon
     """
-    pass
+    match_debut = start_regex.search(sequence, start, stop)
+    if not match_debut:
+        return None  
+    else:
+        return match_debut.start(0)
 
 
 def find_stop(stop_regex, sequence, start):
     """Find the stop codon
     """
-    pass
+    match_fin = stop_regex.finditer(sequence, start)
+    for match in match_fin:
+        if not match_fin:
+            return None
+        else: 
+            fin = match.start(0)
+            if (fin - start) % 3 == 0:
+                return fin
+
 
 def has_shine_dalgarno(shine_regex, sequence, start, max_shine_dalgarno_distance):
     """Find a shine dalgarno motif before the start codon
     """
+    truc = shine_regex.compile()
     pass
 
 def predict_genes(sequence, start_regex, stop_regex, shine_regex, 
