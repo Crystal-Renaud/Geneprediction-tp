@@ -1,9 +1,12 @@
 import argparse
 from multiprocessing.resource_sharer import stop
+from pickle import FALSE, TRUE
 import sys
 import os
 import csv
 import re
+
+from numpy import true_divide
 
 
 def isfile(path):
@@ -89,25 +92,49 @@ def find_stop(stop_regex, sequence, start):
     """
     match_fin = stop_regex.finditer(sequence, start)
     for match in match_fin:
-        if not match_fin:
-            return None
-        else: 
-            fin = match.start(0)
-            if (fin - start) % 3 == 0:
-                return fin
+        fin = match.start(0)
+        if (fin - start) % 3 == 0:
+            return fin
 
 
 def has_shine_dalgarno(shine_regex, sequence, start, max_shine_dalgarno_distance):
     """Find a shine dalgarno motif before the start codon
     """
-    truc = shine_regex.compile()
-    pass
+    debut_pos = max(0, start-max_shine_dalgarno_distance)
+    final_pos = (start - 6)
+    seq_shine = shine_regex.finditer(sequence, debut_pos, start)
+    
+    for i in seq_shine:
+        if i.end(0) < final_pos:
+            return True
+    return False
+    
 
 def predict_genes(sequence, start_regex, stop_regex, shine_regex, 
                   min_gene_len, max_shine_dalgarno_distance, min_gap):
     """Predict most probable genes
     """
-    pass
+    pos = 0
+    gene_list = []
+    while (len(sequence) - pos) >= min_gap:
+        pos = find_start(start_regex, sequence, pos, len(sequence))
+        if pos != None: 
+            stop = find_stop(stop_regex, sequence, pos)
+            if stop != None:
+                if (stop - pos) > min_gene_len:
+                    if has_shine_dalgarno(shine_regex, sequence, 
+                    pos, max_shine_dalgarno_distance) == True:
+                        gene_list.append([pos +1, stop + 3])
+                        pos = (stop + 2 + min_gap)
+                    else:
+                        pos += 1
+                else:
+                    pos += 1
+            else:
+                pos += 1
+    return gene_list
+            
+
 
 
 def write_genes_pos(predicted_genes_file, probable_genes):
@@ -169,15 +196,23 @@ def main():
     shine_regex = re.compile('A?G?GAGG|GGAG|GG.{1}GG')
     # Arguments
     args = get_arguments()
+    sequence = read_fasta(args.genome_file)
+    probable_genes = predict_genes(sequence, start_regex, stop_regex, shine_regex, args.min_gene_len, args.max_shine_dalgarno_distance, args.min_gap)
     # Let us do magic in 5' to 3'
     
     # Don't forget to uncomment !!!
     # Call these function in the order that you want
     # We reverse and complement
-    #sequence_rc = reverse_complement(sequence)
+    sequence_rc = reverse_complement(sequence)
+    probable_genes_rc = predict_genes(sequence_rc, start_regex, stop_regex, shine_regex, args.min_gene_len, args.max_shine_dalgarno_distance, args.min_gap)
+    probable_genes_comp = []
+    for i in range(len(probable_genes_rc)):
+        pos1 = len(sequence)-probable_genes_rc[i][1]
+        pos2 = len(sequence)-probable_genes_rc[i][0]
+        probable_genes_comp.append([pos1, pos2])
     # Call to output functions
-    #write_genes_pos(args.predicted_genes_file, probable_genes)
-    #write_genes(args.fasta_file, sequence, probable_genes, sequence_rc, probable_genes_comp)
+    write_genes_pos(args.predicted_genes_file, probable_genes)
+    write_genes(args.fasta_file, sequence, probable_genes, sequence_rc, probable_genes_comp)
 
 
 
